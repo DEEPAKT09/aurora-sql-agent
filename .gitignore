@@ -24,3 +24,5 @@ env/
 *.log
 .pytest_cache/
 .coverage
+
+db_dump/
