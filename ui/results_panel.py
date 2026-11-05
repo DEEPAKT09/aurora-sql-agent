@@ -1,0 +1,318 @@
+
+"""
+AURORA SQL Agent
+Results Panel
+
+Displays query results, execution statistics, data tables,
+visualizations and downloadable CSV/Excel exports.
+"""
+
+from io import BytesIO
+
+import pandas as pd
+import streamlit as st
+import plotly.graph_objects as go
+
+from openpyxl import Workbook
+
+
+def _initialize_results_state():
+    """Initialize results panel session state."""
+
+    defaults = {
+        "sql_execution_result": None,
+        "result_analysis": None,
+        "visualization_figure": None,
+    }
+
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def _get_execution_dataframe(result):
+    """Convert execution records into a Pandas DataFrame."""
+
+    if not isinstance(result, dict):
+        return pd.DataFrame()
+
+    records = result.get("records", [])
+    columns = result.get("columns", [])
+
+    if not records:
+        return pd.DataFrame(columns=columns)
+
+    if isinstance(records, pd.DataFrame):
+        return records.copy()
+
+    if isinstance(records, list):
+        if all(isinstance(row, dict) for row in records):
+            return pd.DataFrame(records, columns=columns or None)
+
+        return pd.DataFrame(records, columns=columns or None)
+
+    return pd.DataFrame(records)
+
+
+def _create_excel_file(dataframe):
+    """Create an Excel file from query results."""
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine="openpyxl",
+    ) as writer:
+        dataframe.to_excel(
+            writer,
+            index=False,
+            sheet_name="Query Results",
+        )
+
+        worksheet = writer.sheets["Query Results"]
+
+        # Adjust column widths.
+        for column_cells in worksheet.columns:
+            max_length = max(
+                len(str(cell.value or ""))
+                for cell in column_cells
+            )
+
+            worksheet.column_dimensions[
+                column_cells[0].column_letter
+            ].width = min(max_length + 2, 40)
+
+    output.seek(0)
+
+    return output.getvalue()
+
+
+def _render_metrics(result, dataframe):
+    """Display query execution metrics."""
+
+    row_count = result.get(
+        "row_count",
+        len(dataframe),
+    )
+
+    execution_time = result.get(
+        "execution_time",
+        0,
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "Total Rows",
+            f"{row_count:,}",
+        )
+
+    with col2:
+        st.metric(
+            "Total Columns",
+            f"{len(dataframe.columns):,}",
+        )
+
+    with col3:
+        st.metric(
+            "Execution Time",
+            f"{execution_time:.3f} sec",
+        )
+
+
+def _render_data_table(dataframe):
+    """Display query records in a data table."""
+
+    st.markdown("### Query Results")
+
+    if dataframe.empty:
+        st.info("The query returned no records.")
+        return
+
+    st.dataframe(
+        dataframe,
+        width="stretch",
+        hide_index=True,
+        height=400,
+    )
+
+
+def _render_download_options(dataframe):
+    """Provide CSV and Excel export options."""
+
+    if dataframe.empty:
+        return
+
+    st.markdown("### Export Results")
+
+    csv_data = dataframe.to_csv(
+        index=False,
+    ).encode("utf-8")
+
+    excel_data = _create_excel_file(dataframe)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.download_button(
+            label="Download CSV",
+            data=csv_data,
+            file_name="aurora_query_results.csv",
+            mime="text/csv",
+            width="stretch",
+        )
+
+    with col2:
+        st.download_button(
+            label="Download Excel",
+            data=excel_data,
+            file_name="aurora_query_results.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            width="stretch",
+        )
+
+
+def _render_analysis():
+    """Display the natural-language result analysis."""
+
+    analysis = st.session_state.get("result_analysis")
+
+    if not analysis:
+        return
+
+    st.divider()
+    st.markdown("### AI Result Analysis")
+
+    if isinstance(analysis, dict):
+        summary = analysis.get(
+            "summary",
+            analysis.get(
+                "analysis",
+                analysis.get("explanation", ""),
+            ),
+        )
+
+        insights = analysis.get("insights", [])
+
+        if summary:
+            st.write(summary)
+
+        if isinstance(insights, list) and insights:
+            st.markdown("**Key Insights**")
+
+            for insight in insights:
+                st.markdown(f"- {insight}")
+
+    elif isinstance(analysis, str):
+        st.write(analysis)
+
+    else:
+        st.write(str(analysis))
+
+
+def _render_visualization():
+    """Display the chart generated by the visualization agent."""
+
+    figure = st.session_state.get(
+        "visualization_figure"
+    )
+
+    if figure is None:
+        return
+
+    st.divider()
+    st.markdown("### Data Visualization")
+
+    try:
+        if isinstance(figure, go.Figure):
+            st.plotly_chart(
+                figure,
+                width="stretch",
+            )
+
+        elif isinstance(figure, dict):
+            st.plotly_chart(
+                figure,
+                width="stretch",
+            )
+
+        else:
+            st.warning(
+                "The visualization output is not in a supported format."
+            )
+
+    except Exception as exc:
+        st.error(f"Unable to display visualization: {exc}")
+
+
+def render_results_panel(result=None):
+    """
+    Render the complete query results panel.
+
+    Args:
+        result: Optional SQL execution result dictionary.
+
+    Returns:
+        pandas.DataFrame: The displayed query results.
+    """
+
+    _initialize_results_state()
+
+    if result is None:
+        result = st.session_state.get(
+            "sql_execution_result"
+        )
+
+    st.title("Query Results")
+
+    st.caption(
+        "View, analyze, visualize and export your database query results."
+    )
+
+    if not result:
+        st.info(
+            "No query results are available yet. "
+            "Submit a natural-language question or execute a SQL query."
+        )
+        return pd.DataFrame()
+
+    if not isinstance(result, dict):
+        st.error("Invalid query execution result.")
+        return pd.DataFrame()
+
+    if not result.get("success", False):
+        st.error(
+            result.get(
+                "error",
+                "Query execution failed.",
+            )
+        )
+        return pd.DataFrame()
+
+    dataframe = _get_execution_dataframe(result)
+
+    # Execution metrics.
+    _render_metrics(
+        result,
+        dataframe,
+    )
+
+    st.divider()
+
+    # Query results.
+    _render_data_table(dataframe)
+
+    # Data exports.
+    _render_download_options(dataframe)
+
+    # AI-generated analysis.
+    _render_analysis()
+
+    # Generated visualization.
+    _render_visualization()
+
+    return dataframe

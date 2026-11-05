@@ -1,0 +1,62 @@
+[
+    {
+        "id": "TC001",
+        "category": "Basic Retrieval",
+        "question": "Show all customers.",
+        "expected_sql": "SELECT * FROM customers"
+    },
+    {
+        "id": "TC002",
+        "category": "Filtering",
+        "question": "Show all customers from Chennai.",
+        "expected_sql": "SELECT * FROM customers WHERE city = 'Chennai'"
+    },
+    {
+        "id": "TC003",
+        "category": "Sorting",
+        "question": "Show the five most recently registered customers.",
+        "expected_sql": "SELECT * FROM customers ORDER BY created_at DESC LIMIT 5"
+    },
+    {
+        "id": "TC004",
+        "category": "Aggregation",
+        "question": "Count the total number of customers.",
+        "expected_sql": "SELECT COUNT(*) AS total_customers FROM customers"
+    },
+    {
+        "id": "TC005",
+        "category": "Aggregation",
+        "question": "Find the average order amount.",
+        "expected_sql": "SELECT AVG(total_amount) AS average_order_amount FROM orders"
+    },
+    {
+        "id": "TC006",
+        "category": "Grouping",
+        "question": "Show the total number of orders placed by each customer.",
+        "expected_sql": "SELECT customer_id, COUNT(*) AS total_orders FROM orders GROUP BY customer_id"
+    },
+    {
+        "id": "TC007",
+        "category": "Joins",
+        "question": "Show customer names along with their order amounts.",
+        "expected_sql": "SELECT customers.name, orders.total_amount FROM customers JOIN orders ON customers.id = orders.customer_id"
+    },
+    {
+        "id": "TC008",
+        "category": "Filtering and Aggregation",
+        "question": "Find customers who have placed more than five orders.",
+        "expected_sql": "SELECT customer_id, COUNT(*) AS total_orders FROM orders GROUP BY customer_id HAVING COUNT(*) > 5"
+    },
+    {
+        "id": "TC009",
+        "category": "Date Analysis",
+        "question": "Show all orders placed during 2025.",
+        "expected_sql": "SELECT * FROM orders WHERE order_date >= '2025-01-01' AND order_date < '2026-01-01'"
+    },
+    {
+        "id": "TC010",
+        "category": "Business Analysis",
+        "question": "Find the top five products based on total sales quantity.",
+        "expected_sql": "SELECT product_id, SUM(quantity) AS total_quantity_sold FROM order_items GROUP BY product_id ORDER BY total_quantity_sold DESC LIMIT 5"
+    }
+]

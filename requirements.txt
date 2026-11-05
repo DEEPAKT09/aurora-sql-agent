@@ -1,0 +1,16 @@
+
+streamlit
+langchain
+langchain-core
+langchain-google-genai
+langgraph
+sqlalchemy
+sqlglot
+psycopg[binary]
+pymysql
+pandas
+plotly
+openpyxl
+python-dotenv
+langsmith
+pytest
